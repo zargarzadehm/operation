@@ -17,7 +17,7 @@ services:
       retries: 3
 
   service:
-    image: ghcr.io/rosen-bridge/guard-service:${GUARD_IMAGE_VERSION:-latest}
+    image: ghcr.io/zargarzadehm/guard-service:${GUARD_IMAGE_VERSION:-latest}
     environment:
       - POSTGRES_HOST=db
     env_file:
