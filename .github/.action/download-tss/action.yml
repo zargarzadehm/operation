@@ -1,0 +1,48 @@
+name: "Download assets from release"
+description: "Download assets from release of a repository"
+
+inputs:  
+  version:
+    description: "version of release (for example 2.*) [Default: last one]"
+  prefix_version:
+    description: "prefix of version (for example tss-api) [Default: tss-api]"
+    default: "tss-api"
+  repo_url:
+    description: "url of repo (for example rosen-bridge/sign-protocols) [Default: rosen-bridge/sign-protocols]"
+    default: "rosen-bridge/sign-protocols"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Fetch ${{inputs.repo_url}} Links
+      shell: bash
+      id: version
+      run: |
+        if [ -z "${{inputs.version}}" ]
+        then
+          # Get the list of tags matching the regex pattern
+          tags=$(gh api repos/${{inputs.repo_url}}/releases?per_page=100 | jq -r '.[].tag_name' | grep -E '^${{inputs.prefix_version}}-.+$')
+
+          # Check if any tags were found
+          if [[ -z "$tags" ]]; then
+            echo "No tags matching the pattern '${{inputs.prefix_version}}-*' were found."
+            exit 1
+          fi
+
+          # Extract the latest tag using version sorting
+          latest_tag=$(echo "$tags" | sort -V | tail -n 1)
+          echo "Latest tag matching for'${{inputs.prefix_version}}-*': $latest_tag"
+          echo $latest_tag >> $GITHUB_OUTPUT
+          
+        else
+          echo "download_version=$(echo "${{inputs.prefix_version}}-${{inputs.version}}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Download Contracts Files
+      shell: bash
+      run: |
+        release_info=$(curl -s "https://api.github.com/repos/${{inputs.repo_url}}/releases/tags/${{steps.version.outputs.download_version}}")
+        asset_urls=$(echo "$release_info" | jq -r --arg name "${{inputs.type}}" '.assets | map(select(.name | test($name))) | .[].browser_download_url')
+        for url in $asset_urls; do
+          curl -LJO "$url"
+        done
